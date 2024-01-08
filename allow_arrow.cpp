@@ -10,7 +10,9 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+#include <cstdint>
 #include <optional>
+#include <bit>
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -26,103 +28,97 @@ using namespace AviUtl;
 ////////////////////////////////
 // ウィンドウフックのラッパー．
 ////////////////////////////////
+template<class TWnd>
 class HookTarget
 {
-public:
-	using HookProc = std::optional<LRESULT>(*)(/*HWND hwnd, */UINT message, WPARAM wparam, LPARAM lparam/*, HookTarget* that*/);
-
-private:
-	HookProc hookProc = nullptr;
-	static LRESULT CALLBACK callback(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, uintptr_t uid, auto)
+	static LRESULT CALLBACK subclassproc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, uintptr_t uid, auto)
 	{
-		if (auto that = reinterpret_cast<HookTarget*>(uid);
-			that->hookProc != nullptr) {
-			if (auto ret = that->hookProc(/*hwnd, */message, wparam, lparam/*, that*/))
+		if (reinterpret_cast<HookTarget<TWnd>*>(uid)->hwnd != nullptr) {
+			if (auto ret = TWnd::callback(message, wparam, lparam))
 				return *ret;
 		}
 		return ::DefSubclassProc(hwnd, message, wparam, lparam);
 	}
 	auto hook_uid() { return reinterpret_cast<uintptr_t>(this); }
 
+protected:
+	HWND hwnd = nullptr;
+
 public:
 	// hooking window procedures.
-	bool setup_hook(HookProc func)
+	bool begin_hook()
 	{
-		if (auto hwnd = get_hwnd(); hwnd != nullptr) {
-			hookProc = func;
-			return ::SetWindowSubclass(hwnd, callback, hook_uid(), 0) != FALSE;
-		}
+		if (hwnd != nullptr)
+			return ::SetWindowSubclass(hwnd, subclassproc, hook_uid(), 0) != FALSE;
 		return false;
 	}
-	bool remove_hook()
+	bool end_hook()
 	{
-		hookProc = nullptr;
-		if (auto hwnd = get_hwnd(); hwnd != nullptr)
-			return ::RemoveWindowSubclass(hwnd, callback, hook_uid()) != FALSE;
+		if (hwnd != nullptr)
+			return ::RemoveWindowSubclass(hwnd, subclassproc, hook_uid()) != FALSE;
 		return false;
 	}
 
 	void send_message(auto... args)
 	{
-		if (auto hwnd = get_hwnd(); hwnd != nullptr && ::IsWindowVisible(hwnd) != FALSE) {
+		if (hwnd != nullptr && ::IsWindowVisible(hwnd) != FALSE) {
 			// 注意: 非表示の設定ダイアログに特定のメッセージを送ると例外が飛ぶ．
-			auto t = hookProc; hookProc = nullptr;
-			::SendMessageW(hwnd, args...);
-			hookProc = t;
+			auto t = hwnd; hwnd = nullptr;
+			::SendMessageW(t, args...);
+			hwnd = t;
 		}
 	}
-
-	virtual HWND get_hwnd() = 0;
 };
 
 // 拡張編集ウィンドウ．
-inline class : public HookTarget {
-	FilterPlugin* exeditfp = nullptr;
-	static FilterPlugin* get_exeditfp(FilterPlugin* fp)
+inline constinit class ExEditWindow : public HookTarget<ExEditWindow> {
+	static FilterPlugin* get_exeditfp(FilterPlugin* this_fp)
 	{
 		auto h_exedit = ::GetModuleHandleW(L"exedit.auf");
-		SysInfo si; fp->exfunc->get_sys_info(nullptr, &si);
+		SysInfo si; this_fp->exfunc->get_sys_info(nullptr, &si);
 		for (int i = 0; i < si.filter_n; i++) {
-			auto fp_other = fp->exfunc->get_filterp(i);
-			if (fp_other->dll_hinst == h_exedit) return fp_other;
+			auto that_fp = this_fp->exfunc->get_filterp(i);
+			if (that_fp->dll_hinst == h_exedit) return that_fp;
 		}
 		return nullptr;
 	}
 
 public:
-	HWND get_hwnd() override { return exeditfp != nullptr ? exeditfp->hwnd : nullptr; }
 	bool init(FilterPlugin* fp)
 	{
-		exeditfp = get_exeditfp(fp);
-		return exeditfp != nullptr;
+		auto exeditfp = get_exeditfp(fp);
+		if (exeditfp != nullptr) hwnd = exeditfp->hwnd;
+		return hwnd != nullptr;
 	}
-} ExEditWindow;
+
+	static std::optional<LRESULT> callback(UINT message, WPARAM wparam, LPARAM lparam);
+} exedit_window;
 
 // 設定ダイアログ．
-inline class : public HookTarget {
-	HWND hwnd = nullptr;
+inline constinit class SettingDlg : public HookTarget<SettingDlg> {
 	static auto get_settingdlg()
 	{
 		return ::FindWindowW(L"ExtendedFilterClass", nullptr);
 	}
 
 public:
-	HWND get_hwnd() override { return hwnd; }
 	bool init()
 	{
 		hwnd = get_settingdlg();
 		return hwnd != nullptr;
 	}
-} SettingDlg;
+
+	static std::optional<LRESULT> callback(UINT message, WPARAM wparam, LPARAM lparam);
+} setting_dlg;
 
 // メインウィンドウ．
-inline struct {
+inline constinit struct {
 	HWND hwnd = nullptr;
 	auto send_message(auto... args)
 	{
 		return ::SendMessageW(hwnd, args...);
 	}
-} MainWindow;
+} main_window;
 
 
 ////////////////////////////////
@@ -131,13 +127,8 @@ inline struct {
 inline constinit struct Settings {
 	struct {
 		bool Left = false, Right = false, Up = false, Down = false;
-		constexpr bool is_effective() const { return Left || Right || Up || Down; }
-	} Timeline;
-
-	struct {
-		bool Left = false, Right = false;
-		constexpr bool is_effective() const { return Left || Right; }
-	} SettingDlg;
+		constexpr bool is_effective() const { return std::bit_cast<uint32_t>(*this) != 0; }
+	} Timeline, SettingDlg;
 
 	void load(const char* ini_file)
 	{
@@ -148,6 +139,8 @@ inline constinit struct Settings {
 		load_val(Timeline, Down);
 		load_val(SettingDlg, Left);
 		load_val(SettingDlg, Right);
+		load_val(SettingDlg, Up);
+		load_val(SettingDlg, Down);
 #undef load
 	}
 } settings;
@@ -177,18 +170,19 @@ inline void load_settings(HMODULE h_dll)
 // 各種コマンド実行の実装．
 ////////////////////////////////
 struct Menu {
-	enum ID : int32_t {
-		Invalid = -1,
-
-		ExEditLeft = 1,
+	enum class ID : unsigned int {
+		ExEditLeft,
 		ExEditRight,
 		ExEditUp,
 		ExEditDown,
 
 		SettingDlgLeft,
 		SettingDlgRight,
+
+		Invalid,
 	};
-	static constexpr bool is_invalid(ID id) { return id <= Invalid; }
+	using enum ID;
+	static constexpr bool is_invalid(ID id) { return id >= Invalid; }
 	static constexpr bool is_timeline(ID id) { return id <= ExEditDown; }
 	static constexpr bool is_settingdlg(ID id) { return id <= SettingDlgRight; }
 
@@ -211,7 +205,7 @@ bool menu_timeline_handler(Menu::ID id)
 	case Menu::ExEditUp:	vk = VK_UP;		break;
 	case Menu::ExEditDown:	vk = VK_DOWN;	break;
 	}
-	if (vk != 0) ExEditWindow.send_message(WM_KEYDOWN, vk, 0);
+	if (vk != 0) exedit_window.send_message(WM_KEYDOWN, vk, 0);
 	return false;
 }
 
@@ -222,7 +216,7 @@ bool menu_setting_dlg_handler(Menu::ID id)
 	case Menu::SettingDlgLeft:	vk = VK_LEFT;	break;
 	case Menu::SettingDlgRight:	vk = VK_RIGHT;	break;
 	}
-	if (vk != 0) SettingDlg.send_message(WM_KEYDOWN, vk, 0);
+	if (vk != 0) setting_dlg.send_message(WM_KEYDOWN, vk, 0);
 	return false;
 }
 
@@ -230,7 +224,7 @@ bool menu_setting_dlg_handler(Menu::ID id)
 ////////////////////////////////
 // フックのコールバック関数．
 ////////////////////////////////
-std::optional<LRESULT> exedit_hook(/*HWND hwnd, */UINT message, WPARAM wparam, LPARAM lparam/*, HookTarget* that*/)
+inline std::optional<LRESULT> ExEditWindow::callback(UINT message, WPARAM wparam, LPARAM lparam)
 {
 	switch (message) {
 	case WM_KEYDOWN:
@@ -243,13 +237,13 @@ std::optional<LRESULT> exedit_hook(/*HWND hwnd, */UINT message, WPARAM wparam, L
 			case VK_DOWN:	return settings.Timeline.Down;
 			default: return false;
 			}
-		}()) return MainWindow.send_message(message, wparam, lparam);
+		}()) return main_window.send_message(message, wparam, lparam);
 		break;
 	}
 	return std::nullopt;
 }
 
-std::optional<LRESULT> setting_dlg_hook(/*HWND hwnd, */UINT message, WPARAM wparam, LPARAM lparam/*, HookTarget* that*/)
+inline std::optional<LRESULT> SettingDlg::callback(UINT message, WPARAM wparam, LPARAM lparam)
 {
 	switch (message) {
 	case WM_KEYDOWN:
@@ -258,9 +252,11 @@ std::optional<LRESULT> setting_dlg_hook(/*HWND hwnd, */UINT message, WPARAM wpar
 			switch (wparam) {
 			case VK_LEFT:	return settings.SettingDlg.Left;
 			case VK_RIGHT:	return settings.SettingDlg.Right;
+			case VK_UP:		return settings.SettingDlg.Up;
+			case VK_DOWN:	return settings.SettingDlg.Down;
 			default: return false;
 			}
-		}()) return MainWindow.send_message(message, wparam, lparam);
+		}()) return main_window.send_message(message, wparam, lparam);
 		break;
 	}
 	return std::nullopt;
@@ -273,14 +269,14 @@ std::optional<LRESULT> setting_dlg_hook(/*HWND hwnd, */UINT message, WPARAM wpar
 BOOL func_init(FilterPlugin* fp)
 {
 	// 拡張編集の確認．
-	if (!ExEditWindow.init(fp)) {
+	if (!exedit_window.init(fp)) {
 		::MessageBoxA(fp->hwnd, "拡張編集が見つかりませんでした．",
 			fp->name, MB_OK | MB_ICONEXCLAMATION);
 		return FALSE;
 	}
 
 	// メインウィンドウのハンドルを取得，保存．
-	MainWindow.hwnd = fp->hwnd_parent;
+	main_window.hwnd = fp->hwnd_parent;
 
 	// message-only window を作成，登録．これで NoConfig でも AviUtl からメッセージを受け取れる.
 	fp->hwnd = ::CreateWindowExW(0, L"AviUtl", L"", 0, 0, 0, 0, 0,
@@ -288,7 +284,7 @@ BOOL func_init(FilterPlugin* fp)
 
 	// メニュー登録．
 	for (auto [id, name] : Menu::Items)
-		fp->exfunc->add_menu_item(fp, name, fp->hwnd, id, 0, ExFunc::AddMenuItemFlag::None);
+		fp->exfunc->add_menu_item(fp, name, fp->hwnd, static_cast<int32_t>(id), 0, ExFunc::AddMenuItemFlag::None);
 
 	// 設定ロード．
 	load_settings(fp->dll_hinst);
@@ -302,13 +298,13 @@ BOOL func_WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, EditHan
 	switch (message) {
 		// 拡張編集タイムライン/設定ダイアログのフック/アンフック．
 	case Message::ChangeWindow:
-		SettingDlg.init();
-		if (settings.Timeline.is_effective()) ExEditWindow.setup_hook(exedit_hook);
-		if (settings.SettingDlg.is_effective()) SettingDlg.setup_hook(setting_dlg_hook);
+		setting_dlg.init();
+		if (settings.Timeline.is_effective()) exedit_window.begin_hook();
+		if (settings.SettingDlg.is_effective()) setting_dlg.begin_hook();
 		break;
 	case Message::Exit:
-		if (settings.Timeline.is_effective()) ExEditWindow.remove_hook();
-		if (settings.SettingDlg.is_effective()) SettingDlg.remove_hook();
+		if (settings.Timeline.is_effective()) exedit_window.end_hook();
+		if (settings.SettingDlg.is_effective()) setting_dlg.end_hook();
 
 		// message-only window を削除．必要ないかもしれないけど．
 		fp->hwnd = nullptr; ::DestroyWindow(hwnd);
@@ -333,7 +329,7 @@ BOOL func_WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, EditHan
 // 看板．
 ////////////////////////////////
 #define PLUGIN_NAME		"Allow Arrow"
-#define PLUGIN_VERSION	"v1.00"
+#define PLUGIN_VERSION	"v1.10-beta1"
 #define PLUGIN_AUTHOR	"sigma-axis"
 #define PLUGIN_INFO_FMT(name, ver, author)	(name##" "##ver##" by "##author)
 
