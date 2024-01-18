@@ -33,7 +33,7 @@ class HookTarget
 {
 	static LRESULT CALLBACK subclassproc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, uintptr_t uid, auto)
 	{
-		if (reinterpret_cast<HookTarget<TWnd>*>(uid)->hwnd != nullptr) {
+		if (reinterpret_cast<HookTarget*>(uid)->hwnd != nullptr) {
 			if (auto ret = TWnd::callback(message, wparam, lparam))
 				return *ret;
 		}

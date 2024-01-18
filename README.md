@@ -2,7 +2,7 @@
 
 拡張編集のタイムラインウィンドウや設定ダイアログで，方向キーを含むショートカットが上手く動かなかったのを修正するプラグインです．
 
-[ダウンロードはこちら．](https://github.com/sigma-axis/aviutl_allow_arrow/releases)
+[ダウンロードはこちら．](https://github.com/sigma-axis/aviutl_allow_arrow/releases) [紹介動画．](https://www.nicovideo.jp/watch/sm43284722)
 
 
 ## 動作要件
