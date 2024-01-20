@@ -28,34 +28,36 @@ using namespace AviUtl;
 ////////////////////////////////
 // ウィンドウフックのラッパー．
 ////////////////////////////////
-template<class TWnd>
 class HookTarget
 {
+	template<class TSelf>
 	static LRESULT CALLBACK subclassproc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, uintptr_t uid, auto)
 	{
-		if (reinterpret_cast<HookTarget*>(uid)->hwnd != nullptr) {
-			if (auto ret = TWnd::callback(message, wparam, lparam))
-				return *ret;
+		if (reinterpret_cast<TSelf*>(uid)->hwnd != nullptr) {
+			if (auto ret = TSelf::callback(message, wparam, lparam); ret.has_value())
+				return ret.value();
 		}
 		return ::DefSubclassProc(hwnd, message, wparam, lparam);
 	}
-	auto hook_uid() { return reinterpret_cast<uintptr_t>(this); }
+	auto hook_uid() const { return reinterpret_cast<uintptr_t>(this); }
 
 protected:
 	HWND hwnd = nullptr;
 
 public:
 	// hooking window procedures.
-	bool begin_hook()
+	template<class TSelf>
+	bool begin_hook(this const TSelf& self)
 	{
-		if (hwnd != nullptr)
-			return ::SetWindowSubclass(hwnd, subclassproc, hook_uid(), 0) != FALSE;
+		if (self.hwnd != nullptr)
+			return ::SetWindowSubclass(self.hwnd, subclassproc<TSelf>, self.hook_uid(), 0) != FALSE;
 		return false;
 	}
-	bool end_hook()
+	template<class TSelf>
+	bool end_hook(this const TSelf& self)
 	{
-		if (hwnd != nullptr)
-			return ::RemoveWindowSubclass(hwnd, subclassproc, hook_uid()) != FALSE;
+		if (self.hwnd != nullptr)
+			return ::RemoveWindowSubclass(self.hwnd, subclassproc<TSelf>, self.hook_uid()) != FALSE;
 		return false;
 	}
 
@@ -71,7 +73,7 @@ public:
 };
 
 // 拡張編集ウィンドウ．
-inline constinit class ExEditWindow : public HookTarget<ExEditWindow> {
+inline constinit class : public HookTarget {
 	static FilterPlugin* get_exeditfp(FilterPlugin* this_fp)
 	{
 		auto h_exedit = ::GetModuleHandleW(L"exedit.auf");
@@ -91,11 +93,11 @@ public:
 		return hwnd != nullptr;
 	}
 
-	static std::optional<LRESULT> callback(UINT message, WPARAM wparam, LPARAM lparam);
+	inline static std::optional<LRESULT> callback(UINT message, WPARAM wparam, LPARAM lparam);
 } exedit_window;
 
 // 設定ダイアログ．
-inline constinit class SettingDlg : public HookTarget<SettingDlg> {
+inline constinit class : public HookTarget {
 	static auto get_settingdlg()
 	{
 		return ::FindWindowW(L"ExtendedFilterClass", nullptr);
@@ -108,7 +110,7 @@ public:
 		return hwnd != nullptr;
 	}
 
-	static std::optional<LRESULT> callback(UINT message, WPARAM wparam, LPARAM lparam);
+	inline static std::optional<LRESULT> callback(UINT message, WPARAM wparam, LPARAM lparam);
 } setting_dlg;
 
 // メインウィンドウ．
@@ -224,7 +226,7 @@ bool menu_setting_dlg_handler(Menu::ID id)
 ////////////////////////////////
 // フックのコールバック関数．
 ////////////////////////////////
-inline std::optional<LRESULT> ExEditWindow::callback(UINT message, WPARAM wparam, LPARAM lparam)
+inline std::optional<LRESULT> decltype(exedit_window)::callback(UINT message, WPARAM wparam, LPARAM lparam)
 {
 	switch (message) {
 	case WM_KEYDOWN:
@@ -243,7 +245,7 @@ inline std::optional<LRESULT> ExEditWindow::callback(UINT message, WPARAM wparam
 	return std::nullopt;
 }
 
-inline std::optional<LRESULT> SettingDlg::callback(UINT message, WPARAM wparam, LPARAM lparam)
+inline std::optional<LRESULT> decltype(setting_dlg)::callback(UINT message, WPARAM wparam, LPARAM lparam)
 {
 	switch (message) {
 	case WM_KEYDOWN:
@@ -329,7 +331,7 @@ BOOL func_WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, EditHan
 // 看板．
 ////////////////////////////////
 #define PLUGIN_NAME		"Allow Arrow"
-#define PLUGIN_VERSION	"v1.10"
+#define PLUGIN_VERSION	"v1.11-beta1"
 #define PLUGIN_AUTHOR	"sigma-axis"
 #define PLUGIN_INFO_FMT(name, ver, author)	(name##" "##ver##" by "##author)
 
