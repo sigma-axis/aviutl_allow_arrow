@@ -33,7 +33,9 @@ class HookTarget
 	template<class TSelf>
 	static LRESULT CALLBACK subclassproc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, uintptr_t uid, auto)
 	{
-		if (reinterpret_cast<TSelf*>(uid)->hwnd != nullptr) {
+		if (message == WM_DESTROY)
+			::RemoveWindowSubclass(hwnd, subclassproc<TSelf>, uid);
+		else if (reinterpret_cast<TSelf*>(uid)->hwnd != nullptr) {
 			if (auto ret = TSelf::callback(message, wparam, lparam); ret.has_value())
 				return ret.value();
 		}
@@ -51,13 +53,6 @@ public:
 	{
 		if (self.hwnd != nullptr)
 			return ::SetWindowSubclass(self.hwnd, subclassproc<TSelf>, self.hook_uid(), 0) != FALSE;
-		return false;
-	}
-	template<class TSelf>
-	bool end_hook(this const TSelf& self)
-	{
-		if (self.hwnd != nullptr)
-			return ::RemoveWindowSubclass(self.hwnd, subclassproc<TSelf>, self.hook_uid()) != FALSE;
 		return false;
 	}
 
@@ -305,9 +300,6 @@ BOOL func_WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, EditHan
 		if (settings.SettingDlg.is_effective()) setting_dlg.begin_hook();
 		break;
 	case Message::Exit:
-		if (settings.Timeline.is_effective()) exedit_window.end_hook();
-		if (settings.SettingDlg.is_effective()) setting_dlg.end_hook();
-
 		// message-only window を削除．必要ないかもしれないけど．
 		fp->hwnd = nullptr; ::DestroyWindow(hwnd);
 		break;
@@ -328,10 +320,24 @@ BOOL func_WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, EditHan
 
 
 ////////////////////////////////
+// Entry point.
+////////////////////////////////
+BOOL WINAPI DllMain(HINSTANCE hinst, DWORD fdwReason, LPVOID lpvReserved)
+{
+	switch (fdwReason) {
+	case DLL_PROCESS_ATTACH:
+		::DisableThreadLibraryCalls(hinst);
+		break;
+	}
+	return TRUE;
+}
+
+
+////////////////////////////////
 // 看板．
 ////////////////////////////////
 #define PLUGIN_NAME		"Allow Arrow"
-#define PLUGIN_VERSION	"v1.11-beta1"
+#define PLUGIN_VERSION	"v1.11"
 #define PLUGIN_AUTHOR	"sigma-axis"
 #define PLUGIN_INFO_FMT(name, ver, author)	(name##" "##ver##" by "##author)
 
