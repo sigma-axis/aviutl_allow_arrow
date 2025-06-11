@@ -5,7 +5,7 @@
 [ダウンロードはこちら．](https://github.com/sigma-axis/aviutl_allow_arrow/releases) [紹介動画．](https://www.nicovideo.jp/watch/sm43284722)
 
 
-## 動作要件
+##  動作要件
 
 - AviUtl 1.10 + 拡張編集 0.92
 
@@ -17,7 +17,7 @@
 
   https://learn.microsoft.com/ja-jp/cpp/windows/latest-supported-vc-redist
 
-## このプラグインでできること
+##  このプラグインでできること
 
 ...の前に，このプラグインがないと出来なかったことをば．
 
@@ -25,9 +25,9 @@
 
 次のような挙動がありました．
 
-1. AviUtl の設定で `Ctrl + →` などの矢印キーを含むショートカットキーを何かのコマンドに登録する．この `Ctrl + →` を入力すると...
-1. メインウィンドウにフォーカスがある場合，登録したコマンドが実行される（正常）．
-1. 拡張編集のタイムラインウィンドウや設定ダイアログにフォーカスがある場合は登録したコマンドが実行されず，現在フレーム位置が1フレームだけ右に動く．
+1.  AviUtl の設定で `Ctrl + →` などの矢印キーを含むショートカットキーを何かのコマンドに登録する．この `Ctrl + →` を入力すると...
+1.  メインウィンドウにフォーカスがある場合，登録したコマンドが実行される（正常）．
+1.  拡張編集のタイムラインウィンドウや設定ダイアログにフォーカスがある場合は登録したコマンドが実行されず，現在フレーム位置が1フレームだけ右に動く．
 
 つまり，`Ctrl + →` のショートカットキーがタイムラインや設定ダイアログでは使えませんでした．他にも，次の場合にはショートカットキーが動作しません．
 
@@ -43,59 +43,59 @@
 
 そもそも通常のショートカットキーがタイムラインや設定ダイアログで使えること自体が，拡張編集の意図した配慮です．次のような仕組みが元々働いています．
 
-1. タイムラインウィンドウや設定ダイアログでキー入力が行われる．
-1. そのキー入力メッセージがタイムラインや設定ダイアログに送られる．
-1. タイムラインや設定ダイアログのメッセージ処理部分で，そのメッセージをメインウィンドウに転送する．
-1. メインウィンドウ側の処理部分で，それをショートカットキーと解釈してコマンドを実行する．
+1.  タイムラインウィンドウや設定ダイアログでキー入力が行われる．
+1.  そのキー入力メッセージがタイムラインや設定ダイアログに送られる．
+1.  タイムラインや設定ダイアログのメッセージ処理部分で，そのメッセージをメインウィンドウに転送する．
+1.  メインウィンドウ側の処理部分で，それをショートカットキーと解釈してコマンドを実行する．
 
 ただし矢印キーなどの一部キー入力は，タイムラインや設定ダイアログが特別扱いして (3) のメインウィンドウへの転送がなされません．このためショートカットキーと認識されず，そのコマンドも実行されません．その代わりフレーム移動や縦スクロールなど，当該ウィンドウ独自の専用処理が実行されます．
 
 ### このプラグインがやっていること
 
-拡張編集タイムラインウィンドウや設定ダイアログのメッセージ処理部分を乗っ取って，矢印キー入力を検知したら本来の処理に回さずにメインウィンドウに流すような処理をしています．
+拡張編集タイムラインウィンドウや設定ダイアログのメッセージ処理部分を乗っ取って，矢印などの一部キー入力を検知したら本来の処理に回さずにメインウィンドウに流すような処理をしています．
 
-ただしそのままだと代償として，矢印キー入力で本来実行されるフレーム移動やレイヤー方向の縦スクロールが使えなくなるため，これらを実行するコマンドを新たなショートカットキー登録先として追加しています．
+ただしそのままだと代償として，矢印キー入力で本来実行されるフレーム移動やレイヤー方向の縦スクロールなどが使えなくなるため，これらを実行するコマンドを新たなショートカットキー登録先として追加しています．
 
-## 導入方法
+##  導入方法
 
 以下のフォルダのいずれかに `allow_arrow.auf` と `allow_arrow.ini` をコピーしてください．
 
-1. `aviutl.exe` のあるフォルダ
-1. (1) のフォルダにある `plugins` フォルダ
-1. (2) のフォルダにある任意のフォルダ
+1.  `aviutl.exe` のあるフォルダ
+1.  (1) のフォルダにある `plugins` フォルダ
+1.  (2) のフォルダにある任意のフォルダ
 
 また導入後は，導入前の挙動と合わせるために次のショートカットキー設定をしておくのをお勧めします．
 
-1. `↑` キーを「タイムライン上入力」に割り当てる．
+1.  `↑` キーを「タイムライン上入力」に割り当てる．
     - デフォルトだと「削除フレームを飛ばして前のフレームに移動 (↑)」に割り当てられているはずですが，拡張編集がある今日日これは無用の長物でしかないので設定を解除してもまず問題ありません．
 
-1. `↓` キーを「タイムライン下入力」に割り当てる．
+1.  `↓` キーを「タイムライン下入力」に割り当てる．
     - デフォルトだと「削除フレームを飛ばして次のフレームに移動 (↓)」に割り当てられているはずですが，同様に設定を解除してまず問題ありません．
 
-1. `←`, `→` を「前のフレームに移動 (←)」「次のフレームに移動 (→)」に割り当てる．
+1.  `←`, `→` を「前のフレームに移動 (←)」「次のフレームに移動 (→)」に割り当てる．
     - デフォルトで割り当てられてるはずですし，余程のことがない限り変更しないと思われますが念のため．
 
 (1), (2) の設定によってメインウィンドウにフォーカスがあるときでも `↑` や `↓` 入力でレイヤー方向の縦スクロールができるようになります．
 
-## 設定ファイル
+##  設定ファイル
 
 テキストエディタで `allow_arrow.ini` を編集することで，このプラグインによる介入項目を個別に設定できます．
 
-1. `[Timeline]`
+1.  `[Timeline]`
 
     拡張編集のタイムラインウィンドウにフォーカスがあるときの設定で，`hookLeft`, `hookRight`, `hookUp`, `hookDown`, `hookDelete` の5項目があります．
 
-1. `[SettingDlg]`
+1.  `[SettingDlg]`
 
     設定ダイアログにフォーカスがあるときの設定で，`hookLeft`, `hookRight`, `hookUp`, `hookDown` の4項目があります．
 
 これらの項目に `1` を設定すると対応したキー入力に対してこのプラグインが介入し，結果ショートカットキーが動くようになります．`0` を指定したり行を削除 / コメントアウトすると介入が無効化されます．初期値は全て `1`.
 
-## 追加コマンド
+##  追加コマンド
 
 以下のコマンドが追加されます．
 
-![編集→Allow Arrowのメニュー](https://github.com/sigma-axis/aviutl_allow_arrow/assets/132639613/4e4a63db-a4fc-4e45-be63-e7ac5653b0f9)
+![編集→Allow Arrowのメニュー](https://github.com/user-attachments/assets/0695cccf-71f6-4db0-8929-228c63cb2faf)
 
 それぞれタイムラインウィンドウ，設定ダイアログで矢印キーを押したときの元々の動作を実行します．
 
@@ -116,9 +116,9 @@
 
   前後のフレームに移動するコマンドですが，現在選択中オブジェクトが表示される範囲に留まるという性質があります．ユニークな機能ではあるものの，あまり使う機会はないと思われます．
 
-## その他
+##  その他
 
-1. プラグイン名について
+1.  プラグイン名について
 
     - 読み方は「アラウアロー」です．「アローアロー」ではありません．
 
@@ -126,11 +126,11 @@
 
     - ~~日本語名を「矢印ショトカ解放」とかいうクソダサネームにしようか迷ったけど踏み留まった．~~
 
-1. 拙作の[TLショトカ移動](https://github.com/sigma-axis/aviutl_tl_walkaround)を使いやすくするために作成しました．
+1.  拙作の[TLショトカ移動](https://github.com/sigma-axis/aviutl_tl_walkaround)を使いやすくするために作成しました．
 
-1. 他にも拡張編集による特別扱いを受けたキーはありますが，仕組みが違うなどの理由から手を付けていません．
+1.  他にも拡張編集による特別扱いを受けたキーはありますが，仕組みが違うなどの理由から手を付けていません．
 
-## 改版履歴
+##  改版履歴
 
 - **v1.20** (2025-06-??)
 
@@ -164,7 +164,7 @@
   - 初版．
 
 
-## ライセンス
+##  ライセンス
 
 このプログラムの利用・改変・再頒布等に関しては MIT ライセンスに従うものとします．
 
@@ -172,7 +172,7 @@
 
 The MIT License (MIT)
 
-Copyright (C) 2024 sigma-axis
+Copyright (C) 2024-2025 sigma-axis
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -183,7 +183,7 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 https://mit-license.org/
 
 
-#  Credits
+# Credits
 
 ##  aviutl_exedit_sdk
 
@@ -201,7 +201,7 @@ Redistribution and use in source and binary forms, with or without modification,
 Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 THIS SOFTWARE IS PROVIDED BY ePi “AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL ePi BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#  連絡・バグ報告
+# 連絡・バグ報告
 
 - GitHub: https://github.com/sigma-axis
 - Twitter: https://twitter.com/sigma_axis
