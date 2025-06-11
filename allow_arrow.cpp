@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2024 sigma-axis
+Copyright (c) 2024-2025 sigma-axis
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -132,9 +132,13 @@ inline constinit struct {
 ////////////////////////////////
 inline constinit struct Settings {
 	struct {
+		bool Left = false, Right = false, Up = false, Down = false, Delete = false;
+		constexpr bool is_effective() const { return Left || Right || Up || Down || Delete; }
+	} Timeline;
+	struct {
 		bool Left = false, Right = false, Up = false, Down = false;
 		constexpr bool is_effective() const { return std::bit_cast<uint32_t>(*this) != 0; }
-	} Timeline, SettingDlg;
+	} SettingDlg;
 
 	void load(const char* ini_file)
 	{
@@ -143,6 +147,7 @@ inline constinit struct Settings {
 		load_val(Timeline, Right);
 		load_val(Timeline, Up);
 		load_val(Timeline, Down);
+		load_val(Timeline, Delete);
 		load_val(SettingDlg, Left);
 		load_val(SettingDlg, Right);
 		load_val(SettingDlg, Up);
@@ -181,6 +186,7 @@ struct Menu {
 		ExEditRight,
 		ExEditUp,
 		ExEditDown,
+		ExEditDelete,
 
 		SettingDlgLeft,
 		SettingDlgRight,
@@ -189,7 +195,7 @@ struct Menu {
 	};
 	using enum ID;
 	static constexpr bool is_invalid(ID id) { return id >= Invalid; }
-	static constexpr bool is_timeline(ID id) { return id <= ExEditDown; }
+	static constexpr bool is_timeline(ID id) { return id <= ExEditDelete; }
 	static constexpr bool is_settingdlg(ID id) { return id <= SettingDlgRight; }
 
 	inline constexpr static struct { ID id; const char* name; } Items[] = {
@@ -197,6 +203,7 @@ struct Menu {
 		{ ExEditRight,		"タイムライン右入力" },
 		{ ExEditUp,			"タイムライン上入力" },
 		{ ExEditDown,		"タイムライン下入力" },
+		{ ExEditDelete,		"タイムラインDelete入力" },
 		{ SettingDlgLeft,	"設定ダイアログ左入力" },
 		{ SettingDlgRight,	"設定ダイアログ右入力" },
 	};
@@ -206,10 +213,11 @@ bool menu_timeline_handler(Menu::ID id)
 {
 	WPARAM vk = 0;
 	switch (id) {
-	case Menu::ExEditLeft:	vk = VK_LEFT;	break;
-	case Menu::ExEditRight:	vk = VK_RIGHT;	break;
-	case Menu::ExEditUp:	vk = VK_UP;		break;
-	case Menu::ExEditDown:	vk = VK_DOWN;	break;
+	case Menu::ExEditLeft:		vk = VK_LEFT;	break;
+	case Menu::ExEditRight:		vk = VK_RIGHT;	break;
+	case Menu::ExEditUp:		vk = VK_UP;		break;
+	case Menu::ExEditDown:		vk = VK_DOWN;	break;
+	case Menu::ExEditDelete:	vk = VK_DELETE;	break;
 	}
 	if (vk != 0) exedit_window.send_message(WM_KEYDOWN, vk, 0);
 	return false;
@@ -241,6 +249,7 @@ inline std::optional<LRESULT> decltype(exedit_window)::callback(UINT message, WP
 			case VK_RIGHT:	return settings.Timeline.Right;
 			case VK_UP:		return settings.Timeline.Up;
 			case VK_DOWN:	return settings.Timeline.Down;
+			case VK_DELETE:	return settings.Timeline.Delete;
 			default: return false;
 			}
 		}()) return main_window.send_message(message, wparam, lparam);
@@ -349,7 +358,7 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD fdwReason, LPVOID lpvReserved)
 // 看板．
 ////////////////////////////////
 #define PLUGIN_NAME		"Allow Arrow"
-#define PLUGIN_VERSION	"v1.12"
+#define PLUGIN_VERSION	"v1.20-beta1"
 #define PLUGIN_AUTHOR	"sigma-axis"
 #define PLUGIN_INFO_FMT(name, ver, author)	(name##" "##ver##" by "##author)
 
